@@ -1,26 +1,29 @@
-// Delt lagring via kvdb.io (gratis nøkkel-verdi-lager, ingen innlogging).
-// Bucket-ID fungerer som en uoffisiell hemmelighet: alle som har denne URL-en kan lese/skrive.
-const KV_BASE = 'https://kvdb.io/JX69b38cxqLSCsdE2sqic5';
+// Delt lagring via Firebase Realtime Database (REST API, ingen SDK).
+// Databasereglene begrenser lese/skrivetilgang til kun "pullup" og "pullup_updated".
+const KV_BASE = 'https://cathrine-909d8-default-rtdb.europe-west1.firebasedatabase.app';
 
 async function kvGetProgress() {
-  const res = await fetch(KV_BASE + '/pullup', { cache: 'no-store' });
-  if (res.status === 404) return null;
+  const res = await fetch(KV_BASE + '/pullup.json', { cache: 'no-store' });
   if (!res.ok) throw new Error('kv-get-failed:' + res.status);
-  const n = parseInt(await res.text(), 10);
+  const value = await res.json();
+  if (value === null) return null;
+  const n = Number(value);
   return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null;
 }
 
 async function kvGetUpdatedAt() {
-  const res = await fetch(KV_BASE + '/pullup_updated', { cache: 'no-store' });
+  const res = await fetch(KV_BASE + '/pullup_updated.json', { cache: 'no-store' });
   if (!res.ok) return null;
-  const text = await res.text();
-  return text || null;
+  return await res.json();
 }
 
 async function kvSetProgress(value) {
   const v = Math.max(0, Math.min(100, Math.round(value)));
-  const res = await fetch(KV_BASE + '/pullup', { method: 'PUT', body: String(v) });
+  const res = await fetch(KV_BASE + '/pullup.json', { method: 'PUT', body: JSON.stringify(v) });
   if (!res.ok) throw new Error('kv-set-failed:' + res.status);
-  await fetch(KV_BASE + '/pullup_updated', { method: 'PUT', body: new Date().toISOString() });
+  await fetch(KV_BASE + '/pullup_updated.json', {
+    method: 'PUT',
+    body: JSON.stringify(new Date().toISOString()),
+  });
   return v;
 }
