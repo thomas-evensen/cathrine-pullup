@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Har Cathrine tatt en pull-up?</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .stamp {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 0.4em 0.9em;
+    border: 2px solid var(--steel);
+    color: var(--steel);
+    transform: rotate(-3deg);
+  }
+  .stamp.is-yes {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    background: var(--accent);
+  }
+  .verdict-block {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+  }
+  .updated {
+    font-size: 0.68rem;
+    color: var(--steel);
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="eyebrow">Dagens status</p>
+
+    <div class="verdict-block">
+      <p class="mega verdict" id="verdict">–</p>
+      <span class="stamp" id="stamp">–</span>
+    </div>
+
+    <p class="subtitle" id="subtitle">Henter status …</p>
+
+    <div class="gauge-section">
+      <p class="gauge-label">Fremgang mot haken over stanga</p>
+      <div class="rig" id="rigContainer"></div>
+      <div class="readout">
+        <p class="num" id="pct">–<span class="unit">%</span></p>
+        <p class="cap">av veien fra strak arm til hake over stanga</p>
+      </div>
+      <p class="updated" id="updated"></p>
+    </div>
+
+    <footer>
+      <p><a href="update.html">Oppdater dagens resultat →</a></p>
+    </footer>
+  </div>
+
+  <script src="kv.js"></script>
+  <script src="figure.js"></script>
+  <script>
+    (async function () {
+      const verdictEl = document.getElementById('verdict');
+      const stampEl = document.getElementById('stamp');
+      const subtitleEl = document.getElementById('subtitle');
+      const pctEl = document.getElementById('pct');
+      const updatedEl = document.getElementById('updated');
+      const rig = mountRig(document.getElementById('rigContainer'));
+
+      let progress = 0;
+      let fetchFailed = false;
+      try {
+        const stored = await kvGetProgress();
+        progress = stored === null ? 0 : stored;
+      } catch (e) {
+        fetchFailed = true;
+      }
+
+      const hasDone = progress >= 100;
+      verdictEl.textContent = hasDone ? 'JA' : 'NEI';
+      verdictEl.classList.toggle('is-yes', hasDone);
+      stampEl.textContent = hasDone ? 'Bekreftet' : 'Pågår';
+      stampEl.classList.toggle('is-yes', hasDone);
+
+      subtitleEl.textContent = fetchFailed
+        ? 'Kunne ikke hente status akkurat nå. Prøv å laste siden på nytt.'
+        : (hasDone ? 'Cathrine har tatt en pull-up.' : 'Cathrine har ikke tatt en pull-up. Enda.');
+
+      pctEl.innerHTML = progress + '<span class="unit">%</span>';
+      document.title = (hasDone ? 'JA' : 'NEI') + ' – Har Cathrine tatt en pull-up?';
+
+      try {
+        const updatedAt = await kvGetUpdatedAt();
+        if (updatedAt) {
+          const d = new Date(updatedAt);
+          updatedEl.textContent = 'Sist oppdatert ' +
+            d.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' }) + ' kl. ' +
+            d.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
+        }
+      } catch (e) { /* ukritisk, hopp over */ }
+
+      const targetP = progress / 100;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (reduceMotion || fetchFailed) {
+        positionFigure(rig, targetP);
+      } else {
+        const duration = 1300;
+        let start = null;
+        function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+        requestAnimationFrame(function frame(now) {
+          if (start === null) start = now;
+          const t = Math.min(1, (now - start) / duration);
+          positionFigure(rig, easeOutCubic(t) * targetP);
+          if (t < 1) requestAnimationFrame(frame);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

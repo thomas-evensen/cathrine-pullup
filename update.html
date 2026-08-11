@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oppdater – Har Cathrine tatt en pull-up?</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .live-num {
+    font-size: clamp(3.5rem, 16vw, 6rem);
+  }
+  .live-num .unit {
+    font-size: 0.4em;
+    color: var(--steel);
+    margin-left: 0.1em;
+  }
+  .live-caption {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--steel);
+    min-height: 1.4em;
+  }
+  .live-caption.is-yes {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .slider-wrap {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    align-items: center;
+  }
+  input[type="range"] {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--track);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--paper);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--paper);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+  }
+  .save-status {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--steel);
+    min-height: 1.3em;
+  }
+  .save-status.ok { color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="eyebrow">Morgenrutine</p>
+
+    <div class="gauge-section">
+      <p class="gauge-label">Hvor langt kom du i dag?</p>
+      <div class="rig" id="rigContainer"></div>
+      <p class="mega live-num" id="liveNum">–<span class="unit">%</span></p>
+      <p class="live-caption" id="liveCaption"></p>
+    </div>
+
+    <div class="slider-wrap">
+      <input type="range" id="slider" min="0" max="100" step="1" value="0" aria-label="Fremgang i prosent">
+      <button class="btn" id="saveBtn" type="button">Lagre dagens resultat</button>
+      <p class="save-status" id="saveStatus" role="status"></p>
+    </div>
+
+    <footer>
+      <p><a href="index.html">← Se resultatet</a></p>
+    </footer>
+  </div>
+
+  <script src="kv.js"></script>
+  <script src="figure.js"></script>
+  <script>
+    (async function () {
+      const rig = mountRig(document.getElementById('rigContainer'));
+      const slider = document.getElementById('slider');
+      const liveNum = document.getElementById('liveNum');
+      const liveCaption = document.getElementById('liveCaption');
+      const saveBtn = document.getElementById('saveBtn');
+      const saveStatus = document.getElementById('saveStatus');
+
+      function render(p) {
+        const value = Math.round(p);
+        liveNum.innerHTML = value + '<span class="unit">%</span>';
+        liveNum.classList.toggle('is-yes', value >= 100);
+        liveCaption.textContent = value >= 100 ? 'Over stanga! 🎉' : 'Ikke helt over stanga ennå';
+        liveCaption.classList.toggle('is-yes', value >= 100);
+        positionFigure(rig, value / 100);
+      }
+
+      let initial = 0;
+      try {
+        const stored = await kvGetProgress();
+        initial = stored === null ? 0 : stored;
+      } catch (e) {
+        saveStatus.textContent = 'Kunne ikke hente gårsdagens tall, starter på 0.';
+      }
+      slider.value = String(initial);
+      render(initial);
+
+      slider.addEventListener('input', () => render(Number(slider.value)));
+
+      saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        saveStatus.textContent = 'Lagrer …';
+        saveStatus.classList.remove('ok');
+        try {
+          const saved = await kvSetProgress(Number(slider.value));
+          const now = new Date();
+          saveStatus.textContent = 'Lagret ' + saved + ' % kl. ' +
+            now.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' }) + '.';
+          saveStatus.classList.add('ok');
+        } catch (e) {
+          saveStatus.textContent = 'Noe gikk galt. Prøv igjen om litt.';
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
